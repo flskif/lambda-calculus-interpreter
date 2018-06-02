@@ -1,6 +1,6 @@
 module Lib where
 
-import Prelude (Eq((==)), Show(show), String, ($), (++))
+import Prelude (Eq((==)), Show(show), String, ($), (++), Bool(False), (||), (&&), not)
 import Data.Bool (otherwise)
 import Data.List (elem, concatMap, (!!), lookup)
 import Data.Maybe (Maybe(Just, Nothing))
@@ -59,3 +59,23 @@ checkShadowing args (Abs arg expr)
       nested  = checkShadowing (arg : args) expr
 checkShadowing args (App t u) = concatMap (checkShadowing args) [t, u]
 checkShadowing _ _ = []
+
+isFreeVarOf :: Identifier -> Expr -> Bool
+isFreeVarOf _ (Lit _) = False
+isFreeVarOf _ (ErrAbs _ _) = False
+-- The free variables of `x` are just `x`
+isFreeVarOf id (Term t) = id == t
+-- The set of free variables of `λx.t` is the set of free variables of `t`,
+-- but with `x` removed
+isFreeVarOf id (Abs id' t)
+  | id == id' = not $ isFreeVarOf id t
+  | otherwise = isFreeVarOf id t
+-- The set of free variables of `t s` is the union of the set of free 
+-- variables of `t` and the set of free variables of `s`.
+isFreeVarOf id (App t u) = (isFreeVarOf id t) || (isFreeVarOf id u)
+
+etaReduce :: Expr -> Expr
+etaReduce expr@(Abs id (App t (Term id')))
+  | id == id' && (not $ isFreeVarOf id t) = t
+  | otherwise = expr
+etaReduce expr = expr
